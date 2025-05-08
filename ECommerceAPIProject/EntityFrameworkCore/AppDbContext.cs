@@ -1,4 +1,5 @@
-﻿using ECommerceAPIProject.Models;
+﻿using ECommerceAPIProject.EntityFrameworkCore.Entities;
+using ECommerceAPIProject.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection.Emit;

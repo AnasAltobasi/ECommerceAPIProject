@@ -1,4 +1,5 @@
-﻿using ECommerceAPIProject.Models;
+﻿using ECommerceAPIProject.EntityFrameworkCore.Entities;
+using ECommerceAPIProject.Models;
 
 public class Invoice
 {

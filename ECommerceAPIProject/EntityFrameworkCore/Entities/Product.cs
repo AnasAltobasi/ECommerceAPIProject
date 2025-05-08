@@ -1,4 +1,4 @@
-﻿namespace ECommerceAPIProject.Models
+﻿namespace ECommerceAPIProject.EntityFrameworkCore.Entities
 {
     public class Product
     {

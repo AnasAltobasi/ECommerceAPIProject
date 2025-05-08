@@ -1,5 +1,7 @@
 ﻿using ECommerceAPIProject.EntityFrameworkCore;
+using ECommerceAPIProject.EntityFrameworkCore.Entities;
 using ECommerceAPIProject.Models;
+using ECommerceAPIProject.Models.InvoiceDtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +24,22 @@ namespace ECommerceAPIProject.Controllers
             var invoices = await _context.Invoices
                 .Include(i => i.User)
                 .Include(i => i.Details)
-                .ThenInclude(d => d.Product)
+                    .ThenInclude(d => d.Product)
+                .Select(i => new InvoiceSimpleDto
+                {
+                    Id = i.Id,
+                    Date = i.Date,
+                    UserId = i.UserId,
+                    UserName = i.User != null ? i.User.UserName : "Deleted User",
+                    TotalAmount = i.TotalAmount,
+                    Details = i.Details.Select(d => new InvoiceItemDto
+                    {
+                        ProductId = d.ProductId,
+                        ProductName = d.Product != null ? d.Product.EnglishName : "Deleted Product",
+                        Price = d.Price,
+                        Quantity = d.Quantity
+                    }).ToList()
+                })
                 .ToListAsync();
 
             return Ok(invoices);
@@ -36,29 +53,54 @@ namespace ECommerceAPIProject.Controllers
 
             var invoices = await _context.Invoices
                 .Where(i => i.UserId == userId)
-                .Include(i => i.Details)
-                .ThenInclude(d => d.Product)
+                .Select(i => new InvoiceSimpleDto
+                {
+                    Id = i.Id,
+                    Date = i.Date,
+                    TotalAmount = i.TotalAmount,
+                    Details = i.Details.Select(d => new InvoiceItemDto
+                    {
+                        ProductId = d.ProductId,
+                        ProductName = d.Product.EnglishName,
+                        Price = d.Price,
+                        Quantity = d.Quantity
+                    }).ToList()
+                })
                 .ToListAsync();
 
             return Ok(invoices);
         }
 
-        
         [HttpGet("{id}")]
         public async Task<IActionResult> GetInvoice(int id)
         {
             var invoice = await _context.Invoices
                 .Include(i => i.User)
                 .Include(i => i.Details)
-                .ThenInclude(d => d.Product)
+                    .ThenInclude(d => d.Product)
+                .Select(i => new InvoiceDto
+                {
+                    Id = i.Id,
+                    Date = i.Date,
+                    UserId = i.UserId,
+                    UserName = i.User != null ? i.User.UserName : "Deleted User",
+                    TotalAmount = i.TotalAmount,
+                    Items = i.Details.Select(d => new InvoiceItemDto
+                    {
+                        ProductId = d.ProductId,
+                        ProductName = d.Product != null ? d.Product.EnglishName : "Deleted Product",
+                        Price = d.Price,
+                        Quantity = d.Quantity
+                    }).ToList()
+                })
                 .FirstOrDefaultAsync(i => i.Id == id);
 
             if (invoice == null)
                 return NotFound();
 
             // Authorization check
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!User.IsInRole("Admin") && invoice.UserId != userId)
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!User.IsInRole("Admin") && invoice.UserId != currentUserId)
                 return Forbid();
 
             return Ok(invoice);
@@ -66,7 +108,7 @@ namespace ECommerceAPIProject.Controllers
 
         [Authorize(Roles = "Visitor")]
         [HttpPost]
-        public async Task<IActionResult> CreateInvoice([FromBody] InvoiceRequest request)
+        public async Task<IActionResult> CreateInvoice([FromBody] InvoiceRequestDto request)
         {
             try
             {
@@ -75,10 +117,11 @@ namespace ECommerceAPIProject.Controllers
 
                 foreach (var item in request.Items)
                 {
-                    var product = await _context.Products.FindAsync(item.ProductId);
+                    var product = await _context.Products
+                        .FirstOrDefaultAsync(p => p.Id == item.ProductId && !p.IsDeleted);
 
                     if (product == null)
-                        return BadRequest($"Product with ID {item.ProductId} not found");
+                        return BadRequest($"Product with ID {item.ProductId} not found or deleted");
 
                     invoice.Details.Add(new InvoiceDetail
                     {
@@ -91,7 +134,20 @@ namespace ECommerceAPIProject.Controllers
                 invoice.TotalAmount = invoice.Details.Sum(d => d.Price * d.Quantity);
                 _context.Invoices.Add(invoice);
                 await _context.SaveChangesAsync();
-                return Ok(invoice);
+
+                return Ok(new InvoiceDto
+                {
+                    Id = invoice.Id,
+                    Date = invoice.Date,
+                    TotalAmount = invoice.TotalAmount,
+                    Items = invoice.Details.Select(d => new InvoiceItemDto
+                    {
+                        ProductId = d.ProductId,
+                        ProductName = d.Product.EnglishName,
+                        Price = d.Price,
+                        Quantity = d.Quantity
+                    }).ToList()
+                });
             }
             catch (Exception ex)
             {
@@ -101,7 +157,7 @@ namespace ECommerceAPIProject.Controllers
 
         [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateInvoice(int id, [FromBody] InvoiceUpdateRequest request)
+        public async Task<IActionResult> UpdateInvoice(int id, [FromBody] InvoiceRequestDto request)
         {
             var invoice = await _context.Invoices
                 .Include(i => i.Details)
@@ -110,11 +166,12 @@ namespace ECommerceAPIProject.Controllers
             if (invoice == null)
                 return NotFound();
 
-            // Update invoice details
             invoice.Details.Clear();
             foreach (var item in request.Items)
             {
-                var product = await _context.Products.FindAsync(item.ProductId);
+                var product = await _context.Products
+                    .FirstOrDefaultAsync(p => p.Id == item.ProductId && !p.IsDeleted);
+
                 if (product == null)
                     return BadRequest($"Product with ID {item.ProductId} not found");
 
@@ -128,7 +185,20 @@ namespace ECommerceAPIProject.Controllers
 
             invoice.TotalAmount = invoice.Details.Sum(d => d.Price * d.Quantity);
             await _context.SaveChangesAsync();
-            return Ok(invoice);
+
+            return Ok(new InvoiceSimpleDto
+            {
+                Id = invoice.Id,
+                Date = invoice.Date,
+                TotalAmount = invoice.TotalAmount,
+                Details = invoice.Details.Select(d => new InvoiceItemDto
+                {
+                    ProductId = d.ProductId,
+                    ProductName = d.Product.EnglishName,
+                    Price = d.Price,
+                    Quantity = d.Quantity
+                }).ToList()
+            });
         }
 
         [Authorize(Roles = "Admin")]

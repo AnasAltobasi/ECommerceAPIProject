@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using ECommerceAPIProject.Models;
 using ECommerceAPIProject.EntityFrameworkCore;
+using ECommerceAPIProject.EntityFrameworkCore.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 

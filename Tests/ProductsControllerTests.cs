@@ -1,5 +1,6 @@
 ﻿using ECommerceAPIProject.Controllers;
 using ECommerceAPIProject.EntityFrameworkCore;
+using ECommerceAPIProject.EntityFrameworkCore.Entities;
 using ECommerceAPIProject.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;

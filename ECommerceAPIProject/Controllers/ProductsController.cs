@@ -1,9 +1,10 @@
-﻿using ECommerceAPIProject.Models;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ECommerceAPIProject.EntityFrameworkCore;
 using ECommerceAPIProject.EntityFrameworkCore.Entities;
+using ECommerceAPIProject.Models.ProductsDtos;
+using ECommerceAPIProject.Models;
 
 namespace ECommerceAPIProject.Controllers
 {
@@ -18,15 +19,31 @@ namespace ECommerceAPIProject.Controllers
         public ProductsController(AppDbContext context) => _context = context;
 
         [HttpGet]
-        public async Task<IActionResult> GetProducts(int page = 1, int pageSize = 10)
+        public async Task<IActionResult> GetProducts(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10)
         {
+            var totalCount = await _context.Products.CountAsync();
             var products = await _context.Products
                 .Where(p => !p.IsDeleted)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
+                .Select(p => new ProductResponseDto
+                {
+                    Id = p.Id,
+                    ArabicName = p.ArabicName,
+                    EnglishName = p.EnglishName,
+                    Price = p.Price
+                })
                 .ToListAsync();
 
-            return Ok(products);
+            return Ok(new PagedResponse<ProductResponseDto>
+            {
+                Data = products,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            });
         }
 
         [HttpPost]

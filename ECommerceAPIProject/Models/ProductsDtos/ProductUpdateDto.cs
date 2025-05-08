@@ -1,4 +1,4 @@
-﻿namespace ECommerceAPIProject.Models
+﻿namespace ECommerceAPIProject.Models.ProductsDtos
 {
     public class ProductUpdateDto
     {
